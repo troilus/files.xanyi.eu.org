@@ -1,0 +1,30 @@
+Changes
+Code refactoring and memory optimisation,
+Added SetTmr menu to enable or disable RX and TX timers in the status bar,
+Improved Audio Bar,
+Improved Air Copy.
+📘 For explanations of the Air Copy feature, see wiki 📘
+
+Bandscope version, 751 bytes left (with Air Copy).
+Broadcast version, 2 575 bytes left (with Air Copy).
+Bandscope & Broadcast version (without VOX, Audio bare, Air Copy support and new bandscope evolutions since v3.0), 255 bytes left.
+
+Enjoy,
+
+Armel F4HWN.
+
+===
+ 变化
+代码重构和内存优化，
+添加了 SetTmr 菜单，用于在状态栏中启用或禁用 RX 和 TX 定时器，
+ 改进的音频条，
+ 改进了 Air Copy。
+📘 有关 Air Copy 功能的说明，请参阅 wiki 📘
+
+Bandscope 版本，剩余 751 个字节（带 Air Copy）。
+广播版本，剩余 2 575 字节（带 Air Copy）。
+Bandscope & Broadcast 版本（没有 VOX、Audio bare、Air Copy 支持和自 v3.0 以来的新 bandscope 演变），还剩 255 个字节。
+
+ 享受
+
+ 阿梅尔 F4HWN。
