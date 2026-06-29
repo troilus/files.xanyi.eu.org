@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>File Browser</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'Segoe UI','Liberation Sans',sans-serif;font-size:13px;background:#f0f0f0;color:#222;height:100vh;display:flex;flex-direction:column}
+#app{display:flex;flex-direction:column;height:100vh;max-width:1200px;margin:0 auto;width:100%;background:#fff;box-shadow:0 0 20px rgba(0,0,0,.08)}
+/* Toolbar */
+.toolbar{display:flex;align-items:center;gap:10px;padding:6px 12px;background:linear-gradient(#fafafa,#e8e8e8);border-bottom:1px solid #c0c0c0;flex-wrap:wrap}
+.toolbar label{display:flex;align-items:center;gap:4px;color:#555;white-space:nowrap;font-size:12px}
+.search-box{display:flex;align-items:center;border:1px solid #b0b0b0;border-radius:3px;background:#fff;padding:0 8px;flex:1 1 200px;max-width:320px}
+.search-box input{border:none;outline:none;padding:5px 0;font-size:13px;width:100%;background:transparent}
+.search-box .icon{color:#999;margin-right:4px;font-size:14px}
+/* Breadcrumb */
+.breadcrumb-wrap{display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:0}
+.breadcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:2px;font-size:13px;min-width:0}
+.breadcrumb a{color:#2b5797;text-decoration:none;padding:2px 6px;border-radius:3px;white-space:nowrap}
+.breadcrumb a:hover{background:#dce6f0;text-decoration:none}
+.breadcrumb .sep{color:#999;margin:0 1px;user-select:none}
+.breadcrumb .current{color:#333;font-weight:600;padding:2px 6px}
+.toolbar .go-up-btn{background:linear-gradient(#fcfcfc,#e8e8e8);border:1px solid #b0b0b0;border-radius:3px;padding:4px 10px;cursor:pointer;font-size:14px;white-space:nowrap;color:#444}
+.toolbar .go-up-btn:hover{background:linear-gradient(#e8e8e8,#ddd)}
+.toolbar .go-up-btn:disabled{opacity:.4;cursor:default}
+/* Loading / Error */
+.message-area{padding:60px 20px;text-align:center;color:#888;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+.message-area .big-icon{font-size:48px}
+.message-area.error{color:#c33}
+.message-area.error .big-icon{font-size:48px}
+.message-area.loading .spinner{width:32px;height:32px;border:3px solid #ddd;border-top-color:#2b5797;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Table wrapper */
+.table-wrap{flex:1;overflow:auto;position:relative}
+table{width:100%;border-collapse:collapse;table-layout:auto}
+/* Header */
+thead{position:sticky;top:0;z-index:2}
+th{background:linear-gradient(#fcfcfc,#e8e8e8);padding:6px 10px;text-align:left;font-weight:600;font-size:12px;border-bottom:1px solid #c0c0c0;border-right:1px solid #d4d4d4;white-space:nowrap;user-select:none;color:#444;position:sticky;top:0;z-index:2}
+th:last-child{border-right:none}
+th.sortable{cursor:pointer}
+th.sortable:hover{background:linear-gradient(#e8e8e8,#ddd)}
+th .sort-arrow{color:#2b5797;font-size:10px;margin-left:4px;display:inline-block;width:12px;text-align:center}
+th .sort-arrow.active{font-weight:700}
+/* Col widths */
+th:nth-child(1){width:auto}
+th:nth-child(2){width:100px}
+th:nth-child(3){width:90px}
+th:nth-child(4){width:160px}
+/* Rows */
+td{padding:5px 10px;border-bottom:1px solid #e8e8e8;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+tr{transition:background .1s}
+tr:nth-child(even) td{background:#fafafa}
+tr:hover td{background:#e8f0fe}
+tr.parent-row td{color:#888;font-style:italic}
+tr.parent-row:hover td{background:#f0f0f0;color:#555}
+td.name-cell{cursor:pointer;max-width:0;overflow:hidden;text-overflow:ellipsis}
+td.name-cell .icon{margin-right:6px;font-size:15px;vertical-align:middle}
+td.size-cell{text-align:right;color:#555;font-variant-numeric:tabular-nums}
+td.type-cell{color:#666}
+td.date-cell{color:#555;font-variant-numeric:tabular-nums}
+td.dir-size{color:#999}
+/* No results */
+.no-results{padding:40px 20px;text-align:center;color:#aaa}
+/* Status bar */
+.statusbar{display:flex;justify-content:space-between;padding:4px 12px;background:linear-gradient(#fafafa,#e8e8e8);border-top:1px solid #c0c0c0;font-size:12px;color:#555}
+.statusbar .right{color:#888}
+/* Responsive */
+@media(max-width:640px){
+  .toolbar{flex-direction:column;align-items:stretch;gap:6px;padding:8px}
+  .search-box{max-width:none}
+  .breadcrumb-wrap{order:-1}
+  th:nth-child(3),td.type-cell{display:none}
+  th:nth-child(4),td.date-cell{display:none}
+  td{padding:5px 8px}
+}
+/* Scroll bar */
+.table-wrap::-webkit-scrollbar{width:8px;height:8px}
+.table-wrap::-webkit-scrollbar-track{background:#f0f0f0}
+.table-wrap::-webkit-scrollbar-thumb{background:#ccc;border-radius:4px}
+.table-wrap::-webkit-scrollbar-thumb:hover{background:#aaa}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="toolbar">
+    <label class="search-box">
+      <span class="icon">&#x1F50D;</span>
+      <input type="text" id="searchInput" placeholder="搜索文件..." oninput="onSearch()">
+    </label>
+    <button class="go-up-btn" id="goUpBtn" onclick="goUp()" disabled title="返回上级目录">&#x2191; 上级</button>
+    <div class="breadcrumb-wrap">
+      <nav class="breadcrumb" id="breadcrumb"></nav>
+    </div>
+  </div>
+
+  <div class="table-wrap" id="tableWrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="sortable" onclick="sortBy('name')" data-col="name">
+            名称<span class="sort-arrow active" id="sortArrowName">&#x25B2;</span>
+          </th>
+          <th class="sortable" onclick="sortBy('size')" data-col="size">
+            大小<span class="sort-arrow" id="sortArrowSize"></span>
+          </th>
+          <th class="sortable" onclick="sortBy('type')" data-col="type">
+            类型<span class="sort-arrow" id="sortArrowType"></span>
+          </th>
+          <th class="sortable" onclick="sortBy('mtime')" data-col="mtime">
+            修改日期<span class="sort-arrow" id="sortArrowMtime"></span>
+          </th>
+        </tr>
+      </thead>
+      <tbody id="fileList"></tbody>
+    </table>
+    <div id="messageArea" class="message-area loading">
+      <div class="spinner"></div>
+      <div>正在加载文件列表…</div>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <span id="statusLeft">就绪</span>
+    <span class="right" id="statusRight"></span>
+  </div>
+</div>
+
+<script>
+let data = null;
+let currentPath = "";
+let currentEntries = [];
+let sortColumn = "name";
+let sortAsc = true;
+let searchQuery = "";
+
+const ICON_DIR = "\uD83D\uDCC1";
+const ICON_FILE = "\uD83D\uDCC4";
+const ICONS = {
+  apk:"\uD83D\uDCF1",ipa:"\uD83D\uDCF1",pdf:"\uD83D\uDCD5",
+  zip:"\uD83D\uDCE6",rar:"\uD83D\uDCE6","7z":"\uD83D\uDCE6",gz:"\uD83D\uDCE6",
+  jpg:"\uD83D\uDDBC",jpeg:"\uD83D\uDDBC",png:"\uD83D\uDDBC",gif:"\uD83D\uDDBC",webp:"\uD83D\uDDBC",
+  mp3:"\uD83C\uDFB5",wav:"\uD83C\uDFB5",flac:"\uD83C\uDFB5",
+  mp4:"\uD83C\uDFAC",avi:"\uD83C\uDFAC",mkv:"\uD83C\uDFAC",
+  exe:"\u2699\uFE0F",msi:"\u2699\uFE0F",
+  bin:"\uD83D\uDD0C",hex:"\uD83D\uDD0C",
+  py:"\uD83D\uDC0D",js:"\uD83D\uDCDC",html:"\uD83C\uDF10",css:"\uD83C\uDFA8",
+  txt:"\uD83D\uDCDD",json:"\uD83D\uDCCB",xml:"\uD83D\uDCCB",
+  doc:"\uD83D\uDCCB",docx:"\uD83D\uDCCB",xls:"\uD83D\uDCCA",xlsx:"\uD83D\uDCCA",
+  img:"\uD83D\uDDBC",svg:"\uD83D\uDDBC",bmp:"\uD83D\uDDBC",
+};
+
+// --- Helpers ---
+function escapeHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function formatSize(bytes) {
+  if (bytes == null) return "—";
+  if (bytes === 0) return "0 B";
+  const units = ["B","KB","MB","GB","TB"];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const v = bytes / Math.pow(1024, i);
+  return (i === 0 ? v : v.toFixed(1)) + " " + units[i];
+}
+
+function formatDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2,"0");
+  return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()) + " " +
+         pad(d.getHours()) + ":" + pad(d.getMinutes());
+}
+
+function getFileType(name) {
+  if (!name.includes(".")) return "文件";
+  const ext = name.split(".").pop().toLowerCase();
+  const map = {
+    apk:"APK",ipa:"IPA",pdf:"PDF",
+    zip:"ZIP",rar:"RAR","7z":"7z",gz:"GZ",
+    jpg:"JPEG",jpeg:"JPEG",png:"PNG",gif:"GIF",webp:"WEBP",bmp:"BMP",svg:"SVG",
+    mp3:"MP3",wav:"WAV",flac:"FLAC",
+    mp4:"MP4",avi:"AVI",mkv:"MKV",
+    exe:"EXE",msi:"MSI",
+    bin:"BIN",hex:"HEX",
+    py:"Python",js:"JavaScript",html:"HTML",css:"CSS",
+    txt:"TXT",json:"JSON",xml:"XML",
+    doc:"DOC",docx:"DOCX",xls:"XLS",xlsx:"XLSX",
+    pdf:"PDF",exe:"EXE",
+  };
+  return map[ext] || ext.toUpperCase();
+}
+
+function getFileIcon(name) {
+  if (!name.includes(".")) return ICON_FILE;
+  const ext = name.split(".").pop().toLowerCase();
+  return ICONS[ext] || ICON_FILE;
+}
+
+function getParentPath(p) {
+  if (!p || p === "") return "";
+  const parts = p.split("/");
+  parts.pop();
+  return parts.join("/");
+}
+
+// --- Navigation ---
+function findEntries(path) {
+  if (path === "") return data ? data.tree : [];
+  const parts = path.split("/");
+  let e = data.tree;
+  for (const p of parts) {
+    const found = e.find(i => i.name === p && i.type === "dir");
+    if (!found || !found.children) return null;
+    e = found.children;
+  }
+  return e;
+}
+
+function navigateTo(path) {
+  currentPath = path;
+  currentEntries = findEntries(path) || [];
+  render();
+}
+
+function goUp() {
+  const parent = getParentPath(currentPath);
+  navigateTo(parent);
+}
+
+function downloadFile(path) {
+  if (!path) return;
+  window.location.href = path;
+}
+
+// --- Render ---
+function render() {
+  renderBreadcrumb();
+  renderTable();
+  renderStatusBar();
+  document.getElementById("goUpBtn").disabled = (currentPath === "");
+}
+
+function renderBreadcrumb() {
+  const el = document.getElementById("breadcrumb");
+  const parts = currentPath ? currentPath.split("/") : [];
+  let html = '<a href="#" onclick="event.preventDefault();navigateTo(\'\')">\uD83D\uDCC1 根目录</a>';
+  let acc = "";
+  for (let i = 0; i < parts.length; i++) {
+    acc += (acc ? "/" : "") + parts[i];
+    html += '<span class="sep">&rsaquo;</span>';
+    if (i === parts.length - 1) {
+      html += '<span class="current">' + escapeHtml(parts[i]) + '</span>';
+    } else {
+      html += '<a href="#" onclick="event.preventDefault();navigateTo(\'' + acc.replace(/'/g,"\\'") + '\')">' + escapeHtml(parts[i]) + '</a>';
+    }
+  }
+  el.innerHTML = html;
+}
+
+function renderTable() {
+  const tbody = document.getElementById("fileList");
+  const msg = document.getElementById("messageArea");
+
+  let entries = [...currentEntries];
+  if (!entries) entries = [];
+
+  // Add parent dir
+  if (currentPath !== "" && !searchQuery) {
+    entries = [{name:"..",type:"parent",path:getParentPath(currentPath)}].concat(entries);
+  }
+
+  // Filter
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    entries = entries.filter(e => e.type === "parent" || e.name.toLowerCase().includes(q));
+  }
+
+  if (entries.length === 0) {
+    tbody.innerHTML = "";
+    msg.style.display = "flex";
+    msg.className = "message-area";
+    msg.innerHTML = searchQuery
+      ? '<div class="big-icon">\uD83D\uDD0D</div><div>没有匹配的文件</div>'
+      : '<div class="big-icon">\uD83D\uDCC2</div><div>此文件夹为空</div>';
+    return;
+  }
+  msg.style.display = "none";
+
+  // Sort
+  const cmp = (a, b) => {
+    if (a.type === "parent") return -1;
+    if (b.type === "parent") return 1;
+    const aIsDir = a.type === "dir" ? 1 : 0;
+    const bIsDir = b.type === "dir" ? 1 : 0;
+    if (aIsDir !== bIsDir) return bIsDir - aIsDir;
+    let v = 0;
+    if (sortColumn === "name") v = a.name.localeCompare(b.name, "zh");
+    else if (sortColumn === "size") v = (a.size||0) - (b.size||0);
+    else if (sortColumn === "type") v = getFileType(a.name).localeCompare(getFileType(b.name));
+    else if (sortColumn === "mtime") v = (a.mtime||"").localeCompare(b.mtime||"");
+    return sortAsc ? v : -v;
+  };
+  entries.sort(cmp);
+
+  tbody.innerHTML = entries.map(e => {
+    if (e.type === "parent") {
+      return '<tr class="parent-row" onclick="navigateTo(\'' + e.path.replace(/'/g,"\\'") + '\')">' +
+        '<td class="name-cell">\u21A9 ..</td>' +
+        '<td class="size-cell"></td>' +
+        '<td class="type-cell">\u7236\u76EE\u5F55</td>' +
+        '<td class="date-cell"></td></tr>';
+    }
+
+    const isDir = e.type === "dir";
+    const icon = isDir ? ICON_DIR : getFileIcon(e.name);
+    const size = isDir ? "—" : formatSize(e.size);
+    const type = isDir ? "\u6587\u4EF6\u5939" : getFileType(e.name);
+    const mtime = formatDate(e.mtime);
+    const onclick = isDir
+      ? "navigateTo('" + e.path.replace(/'/g,"\\'") + "')"
+      : "downloadFile('" + e.path.replace(/'/g,"\\'") + "')";
+
+    return '<tr onclick="' + onclick + '">' +
+      '<td class="name-cell"><span class="icon">' + icon + '</span>' + escapeHtml(e.name) + '</td>' +
+      '<td class="size-cell">' + size + '</td>' +
+      '<td class="type-cell">' + type + '</td>' +
+      '<td class="date-cell">' + mtime + '</td></tr>';
+  }).join("");
+}
+
+function renderStatusBar() {
+  const files = currentEntries.filter(e => e.type === "file");
+  const dirs = currentEntries.filter(e => e.type === "dir");
+  const totalSize = files.reduce((s, e) => s + (e.size || 0), 0);
+  document.getElementById("statusLeft").textContent =
+    "共 " + currentEntries.length + " 项 (" + files.length + " 个文件, " + dirs.length + " 个文件夹)";
+  document.getElementById("statusRight").textContent =
+    files.length > 0 ? "文件总大小: " + formatSize(totalSize) : "";
+}
+
+function updateSortArrows() {
+  const cols = ["name","size","type","mtime"];
+  cols.forEach(c => {
+    const el = document.getElementById("sortArrow" + c.charAt(0).toUpperCase() + c.slice(1));
+    if (el) {
+      el.textContent = (sortColumn === c) ? (sortAsc ? "\u25B2" : "\u25BC") : "";
+      el.className = "sort-arrow" + (sortColumn === c ? " active" : "");
+    }
+  });
+}
+
+// --- Sort ---
+function sortBy(col) {
+  if (sortColumn === col) {
+    sortAsc = !sortAsc;
+  } else {
+    sortColumn = col;
+    sortAsc = col !== "mtime"; // default: asc for name, desc for date
+  }
+  updateSortArrows();
+  renderTable();
+}
+
+// --- Search ---
+function onSearch() {
+  searchQuery = document.getElementById("searchInput").value.trim();
+  // Re-render but keep current path
+  renderTable();
+  renderStatusBar();
+}
+
+// --- Init ---
+async function init() {
+  const msg = document.getElementById("messageArea");
+  try {
+    const res = await fetch("files.json?_t=" + Date.now());
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    data = await res.json();
+    if (!data || !data.tree) throw new Error("格式错误");
+    navigateTo("");
+  } catch (err) {
+    msg.style.display = "flex";
+    msg.className = "message-area error";
+    msg.innerHTML = '<div class="big-icon">\u26A0\uFE0F</div><div>加载文件列表失败</div><div style="font-size:12px;color:#999;margin-top:4px">' + escapeHtml(err.message) + '</div>';
+    document.getElementById("statusLeft").textContent = "加载失败";
+  }
+}
+
+init();
+</script>
+</body>
+</html>
