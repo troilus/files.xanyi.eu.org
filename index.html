@@ -46,7 +46,11 @@ th .sort-arrow.active{font-weight:700}
 th:nth-child(1){width:auto}
 th:nth-child(2){width:100px}
 th:nth-child(3){width:90px}
-th:nth-child(4){width:160px}
+th:nth-child(4){width:150px}
+th:nth-child(5),td.action-cell{width:60px;text-align:center;padding:4px 6px}
+.copy-btn{background:none;border:1px solid #c0c0c0;border-radius:3px;cursor:pointer;padding:2px 8px;font-size:13px;line-height:1.4;transition:all .15s}
+.copy-btn:hover{background:#dce6f0;border-color:#2b5797}
+.copy-btn.copied{color:#090;border-color:#090;background:#e8f5e9}
 /* Rows */
 td{padding:5px 10px;border-bottom:1px solid #e8e8e8;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 tr{transition:background .1s}
@@ -110,6 +114,7 @@ td.dir-size{color:#999}
           <th class="sortable" onclick="sortBy('mtime')" data-col="mtime">
             修改日期<span class="sort-arrow" id="sortArrowMtime"></span>
           </th>
+          <th style="width:60px">操作</th>
         </tr>
       </thead>
       <tbody id="fileList"></tbody>
@@ -219,11 +224,25 @@ function findEntries(path) {
   return e;
 }
 
-function navigateTo(path) {
+function navigateTo(path, replace) {
   currentPath = path;
   currentEntries = findEntries(path) || [];
+  const url = path ? '/' + path : '/';
+  if (replace) {
+    history.replaceState({path: path}, '', url);
+  } else {
+    history.pushState({path: path}, '', url);
+  }
   render();
 }
+
+window.addEventListener('popstate', function() {
+  const raw = location.pathname.replace(/^\/+|\/+$/g, '');
+  if (raw === currentPath) return;
+  currentPath = raw;
+  currentEntries = findEntries(raw) || [];
+  render();
+});
 
 function goUp() {
   const parent = getParentPath(currentPath);
@@ -233,6 +252,43 @@ function goUp() {
 function downloadFile(path) {
   if (!path) return;
   window.location.href = path;
+}
+
+function copyDownloadLink(path, btn) {
+  var url = location.origin + '/' + path;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(function() {
+      var orig = btn.textContent;
+      btn.textContent = '✓';
+      btn.classList.add('copied');
+      setTimeout(function() {
+        btn.textContent = orig;
+        btn.classList.remove('copied');
+      }, 1500);
+    }).catch(function() { fallbackCopy(url, btn); });
+  } else {
+    fallbackCopy(url, btn);
+  }
+}
+
+function fallbackCopy(url, btn) {
+  var ta = document.createElement('textarea');
+  ta.value = url;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    var orig = btn.textContent;
+    btn.textContent = '✓';
+    btn.classList.add('copied');
+    setTimeout(function() {
+      btn.textContent = orig;
+      btn.classList.remove('copied');
+    }, 1500);
+  } catch (e) {}
+  document.body.removeChild(ta);
 }
 
 // --- Render ---
@@ -311,7 +367,8 @@ function renderTable() {
         '<td class="name-cell">\u21A9 ..</td>' +
         '<td class="size-cell"></td>' +
         '<td class="type-cell">\u7236\u76EE\u5F55</td>' +
-        '<td class="date-cell"></td></tr>';
+        '<td class="date-cell"></td>' +
+        '<td class="action-cell"></td></tr>';
     }
 
     const isDir = e.type === "dir";
@@ -323,11 +380,14 @@ function renderTable() {
       ? "navigateTo('" + e.path.replace(/'/g,"\\'") + "')"
       : "downloadFile('" + e.path.replace(/'/g,"\\'") + "')";
 
+    const actionBtn = isDir ? '' : '<button class="copy-btn" onclick="event.stopPropagation();copyDownloadLink(\'' + e.path.replace(/'/g,"\\'") + '\', this)" title="复制下载链接">📋</button>';
+
     return '<tr onclick="' + onclick + '">' +
       '<td class="name-cell"><span class="icon">' + icon + '</span>' + escapeHtml(e.name) + '</td>' +
       '<td class="size-cell">' + size + '</td>' +
       '<td class="type-cell">' + type + '</td>' +
-      '<td class="date-cell">' + mtime + '</td></tr>';
+      '<td class="date-cell">' + mtime + '</td>' +
+      '<td class="action-cell">' + actionBtn + '</td></tr>';
   }).join("");
 }
 
@@ -380,7 +440,14 @@ async function init() {
     if (!res.ok) throw new Error("HTTP " + res.status);
     data = await res.json();
     if (!data || !data.tree) throw new Error("格式错误");
-    navigateTo("");
+    const params = new URLSearchParams(location.search);
+    const redirect = params.get('r');
+    if (redirect) {
+      navigateTo(redirect, true);
+    } else {
+      const path = location.pathname.replace(/^\/+|\/+$/g, '');
+      navigateTo(path, true);
+    }
   } catch (err) {
     msg.style.display = "flex";
     msg.className = "message-area error";

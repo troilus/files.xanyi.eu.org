@@ -1,0 +1,8 @@
+<!DOCTYPE html>
+<script>
+  var p = location.pathname.replace(/^\//, '').replace(/\/$/, '');
+  if (p)
+    location.replace('/?r=' + encodeURIComponent(p));
+  else
+    location.replace('/');
+</script>

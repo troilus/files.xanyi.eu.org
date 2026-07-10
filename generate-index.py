@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timezone
 
 EXCLUDE_DIRS = {'.git', '.github', '__pycache__'}
-EXCLUDE_FILES = {'files.json', 'generate-index.py'}
+EXCLUDE_FILES = {'files.json', 'generate-index.py', '404.html'}
 
 
 def build_tree(dir_path, rel_path=""):
