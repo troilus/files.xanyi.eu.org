@@ -1,5 +1,9 @@
 - 新增历史记录，在菜单里的LBJMSG
-- lbjedit app可以保存5个地址，
+- 已弃用（lbjedit app可以保存5个地址）
 - 适配F4HWN 6.2.0 APP相关功能，可安装新版APP
 - 适配F4HWN多系统，菜单可以设置弹窗时间，ON是不关闭
 - 新增 LBJLOG（是否记录LOG）、LBJCLR（清除日志），网页LOG下载地址https://lbj.xanyi.eu.org/，需要用K头写频线。优化LED闪烁（新报文解码才闪）
+- 新增长按M、短按或长按侧键1、2弹出LBJMSG弹窗，需要自行设置
+- 设置菜单新增LBJHST，用来查看LBJLOG记录的历史条目
+- 设置菜单分类二级菜单，LBJ相关设置归类，通过该选项直接设置多个定位地址，无需lbjedit app
+- 解码成功弹窗LED闪烁优化，增加闪烁次数
